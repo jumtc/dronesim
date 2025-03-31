@@ -40,17 +40,23 @@ class DroneSimulator:
             if key not in self.user_input:
                 return f"Missing required key: {key}"
                 
-            if not isinstance(self.user_input[key], (int, str)):
-                return f"'{key}' must be an integer or string"
+            # if not isinstance(self.user_input[key], (int, str)):
+            #     return f"'{key}' must be an integer or string"
                 
-            if key == "speed" and not (0 <= self.user_input[key] <= 5):
-                return f"'speed' must be between 0 and 5, got {self.user_input[key]}"
+            if key == "speed":
+                if not isinstance(self.user_input[key], int):
+                    return f"'speed' must be an integer, got {type(self.user_input[key]).__name__}"
+                if not (0 <= self.user_input[key] <= 5):
+                    return f"'speed' must be between 0 and 5, got {self.user_input[key]}"
                 
             if key == "altitude" and not isinstance(self.user_input[key], int):
                 return f"'altitude' must be an integer, got {type(self.user_input[key]).__name__}"
                 
-            if key == "movement" and self.user_input[key] not in ["fwd", "rev"]:
-                return f"'movement' must be one of ['fwd', 'rev'], got '{self.user_input[key]}'"
+            if key == "movement":
+                if not isinstance(self.user_input[key], str):
+                    return f"'movement' must be a string"
+                if self.user_input[key] not in ["fwd", "rev"]:
+                    return f"'movement' must be one of ['fwd', 'rev'], got '{self.user_input[key]}'"
                 
         return True
 
