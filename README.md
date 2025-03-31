@@ -139,7 +139,3 @@ Run the automated tests with:
 ```bash
 pytest
 ```
-
-## License
-
-This project is licensed under the MIT License.
