@@ -81,7 +81,7 @@ class DroneSimulator:
             self.telemetry["y_position"] = self.telemetry["y_position"] + self.altitude_change
 
         # Simulate battery drain
-        self.telemetry["battery"] = self.telemetry["battery"] - (.5 * self.speed + abs(self.altitude_change) * 0.005)
+        self.telemetry["battery"] = self.telemetry["battery"] - (.5 * self.speed + abs(self.altitude_change) * 0.005) - 0.5
         # Random environmental changes
         self._update_environmental_conditions()
         self._check_drone_crash()
