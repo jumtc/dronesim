@@ -29,7 +29,7 @@ class DroneSimulator:
 
         self.telemetry = initial_telemetry
         self.movement_speed = 5
-        self.max_x_position = 1000
+        self.max_x_position = 100000
 
     def validate_input(self) -> Union[bool, str]:
         if not isinstance(self.user_input, dict):
@@ -121,6 +121,9 @@ class DroneSimulator:
         else:
             self.telemetry["sensor_status"] = "GREEN"
 
+        # fix sensor status for now
+        self.telemetry["sensor_status"] = "GREEN"
+
     def _check_drone_crash(self):
         if self.telemetry["battery"] <= 0:
             self.telemetry["battery"] = 0
@@ -136,12 +139,12 @@ if __name__ == "__main__":
     
     # Example user input
     user_input = {
-        "speed": 5,
-        "altitude": 1,
+        "speed": 0,
+        "altitude": 0,
         "movement": "fwd"
     }
     i = 0
-    while (i<60):
+    while (True):
         try:
             telemetry = drone.update_telemetry(user_input)
             print(json.dumps(telemetry, indent=3))
@@ -153,5 +156,5 @@ if __name__ == "__main__":
             break
         #add delay of 1sec
         i+=1
-        time.sleep(1)
+        time.sleep(0.1)
 
