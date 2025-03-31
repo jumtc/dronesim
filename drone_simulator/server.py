@@ -90,13 +90,19 @@ class DroneSimulatorServer:
             return response
             
         except ValueError as e:
+            crash_message = str(e)
+            logger.warning(f"Drone crashed for {connection_id}: {crash_message}")
+            
+            # Create a detailed crash response
             return {
-                "status": "error",
-                "message": str(e),
+                "status": "crashed",  # Changed from "error" to "crashed"
+                "message": crash_message,
                 "metrics": {
                     "iterations": metrics["iterations"],
                     "total_distance": metrics["total_distance"]
-                }
+                },
+                "final_telemetry": drone.telemetry,
+                "connection_terminated": True  # Signal to client that connection should end
             }
 
     async def handle_connection(self, websocket: WebSocketServerProtocol) -> None:
@@ -125,6 +131,12 @@ class DroneSimulatorServer:
                     
                     response = await self.handle_drone_command(connection_id, data)
                     await websocket.send(json.dumps(response))
+                    
+                    # If the drone has crashed, terminate the connection
+                    if response.get("status") == "crashed" and response.get("connection_terminated", False):
+                        logger.info(f"Terminating connection for {connection_id} due to drone crash")
+                        await websocket.close(code=1000, reason=f"Drone crashed: {response.get('message')}")
+                        break
                     
                 except json.JSONDecodeError:
                     await websocket.send(json.dumps({

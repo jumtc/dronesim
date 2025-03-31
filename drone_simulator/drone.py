@@ -16,6 +16,8 @@ class DroneSimulator:
         self.user_input = None
         self.iteration_count = 0
         self.total_distance = 0
+        self.crashed = False
+        self.crash_reason = None
 
     def validate_input(self) -> Union[bool, str]:
         """Validate user input."""
@@ -23,6 +25,10 @@ class DroneSimulator:
 
     def update_telemetry(self, user_input: Dict[str, Union[int, str]]) -> Dict:
         """Update drone telemetry based on user input."""
+        # If drone is already crashed, don't process new commands
+        if self.crashed:
+            raise ValueError(f"Drone has crashed: {self.crash_reason}. Cannot accept new commands.")
+            
         self.user_input = user_input
         validation_result = self.validate_input()
         if validation_result is not True:
@@ -31,30 +37,65 @@ class DroneSimulator:
         # Store previous position for distance calculation
         prev_x_position = self.telemetry["x_position"]
         
-        self._update_position()
-        self._update_battery()
-        self._update_environmental_conditions()
-        self._check_drone_crash()
-        
-        # Calculate distance traveled
-        distance = abs(self.telemetry["x_position"] - prev_x_position)
-        self.total_distance += distance
-        
-        # Count iterations when speed is not zero
-        if user_input.get("speed", 0) != 0:
-            self.iteration_count += 1
-        
-        # Save updated telemetry
-        self.telemetry_manager.update_telemetry(self.telemetry)
-        
-        return self.telemetry
+        try:
+            self._update_position()
+            self._update_battery()
+            self._update_environmental_conditions()
+            self._check_drone_crash()
+            
+            # Calculate distance traveled
+            distance = abs(self.telemetry["x_position"] - prev_x_position)
+            self.total_distance += distance
+            
+            # Count iterations when speed is not zero
+            if user_input.get("speed", 0) != 0:
+                self.iteration_count += 1
+            
+            # Save updated telemetry
+            self.telemetry_manager.update_telemetry(self.telemetry)
+            
+            return self.telemetry
+            
+        except ValueError as e:
+            # Mark the drone as crashed and save the crash reason
+            self.crashed = True
+            self.crash_reason = str(e)
+            
+            # Save the final state
+            self.telemetry_manager.update_telemetry(self.telemetry)
+            
+            # Re-raise the exception
+            raise
     
     def get_metrics(self) -> Dict[str, Any]:
         """Get drone performance metrics."""
-        return {
+        metrics = {
             "iterations": self.iteration_count,
             "total_distance": self.total_distance
         }
+        
+        if self.crashed:
+            metrics["crashed"] = True
+            metrics["crash_reason"] = self.crash_reason
+            
+        return metrics
+    
+    def reset(self) -> None:
+        """Reset the drone to its initial state."""
+        self.telemetry = {
+            "x_position": 0,
+            "y_position": 0, 
+            "battery": 100,
+            "gyroscope": [0.0, 0.0, 0.0],
+            "wind_speed": 0,
+            "dust_level": 0,
+            "sensor_status": "GREEN"
+        }
+        self.telemetry_manager.update_telemetry(self.telemetry)
+        self.iteration_count = 0
+        self.total_distance = 0
+        self.crashed = False
+        self.crash_reason = None
     
     def _update_position(self) -> None:
         """Update drone position based on user input."""
@@ -91,6 +132,7 @@ class DroneSimulator:
             raise ValueError("Drone has crashed due to battery depletion.")
             
         if self.telemetry["y_position"] < 0:
+            self.telemetry["y_position"] = 0  # Reset to ground level
             raise ValueError("Drone has crashed due to negative altitude.")
             
         if abs(self.telemetry["x_position"]) > self.max_x_position:

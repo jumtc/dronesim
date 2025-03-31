@@ -80,7 +80,31 @@ class DroneClient:
             await websocket.send(json.dumps(data))
             
             response = await websocket.recv()
-            return json.loads(response)
+            data = json.loads(response)
+            
+            # Check if the drone has crashed
+            if data.get("status") == "crashed":
+                print(f"\n*** DRONE CRASHED: {data.get('message')} ***")
+                print("Connection will be terminated.")
+                
+                # Update metrics one last time
+                if "metrics" in data:
+                    self.metrics = data["metrics"]
+                
+                # Show final telemetry
+                if "final_telemetry" in data:
+                    self.telemetry = data["final_telemetry"]
+                    self.display_status()
+                
+                print("\nFinal Flight Statistics:")
+                print(f"Total distance traveled: {self.metrics.get('total_distance', 0)}")
+                print(f"Successful flight iterations: {self.metrics.get('iterations', 0)}")
+                print("\nConnection terminated due to crash")
+                
+                # Return None to indicate a crash occurred
+                return None
+                
+            return data
             
         except websockets.exceptions.ConnectionClosed as e:
             logger.error(f"Connection closed while sending command: {e}")

@@ -92,7 +92,26 @@ class SimpleDroneClient:
             response = await websocket.recv()
             data = json.loads(response)
             
-            # Update our local state
+            # Check if the drone has crashed
+            if data.get("status") == "crashed":
+                print(f"\n*** DRONE CRASHED: {data.get('message')} ***")
+                print("Connection will be terminated.")
+                
+                # Update our local state one last time
+                if "metrics" in data:
+                    self.metrics = data["metrics"]
+                
+                # Show final telemetry
+                if "final_telemetry" in data:
+                    self.telemetry = data["final_telemetry"]
+                
+                print("\nFinal Flight Statistics:")
+                print(f"Total distance traveled: {self.metrics.get('total_distance', 0)}")
+                print(f"Successful flight iterations: {self.metrics.get('iterations', 0)}")
+                
+                return False
+            
+            # Update our local state for normal responses
             if data["status"] == "success":
                 self.telemetry = data["telemetry"]
                 self.metrics = data["metrics"]
