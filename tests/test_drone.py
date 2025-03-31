@@ -8,9 +8,9 @@ from pathlib import Path
 # Add the parent directory to sys.path to allow imports from the package
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from drone import DroneSimulator
-from telemetry import TelemetryManager
-from environment import EnvironmentSimulator
+from drone_simulator.drone import DroneSimulator
+from drone_simulator.telemetry import TelemetryManager
+from drone_simulator.environment import EnvironmentSimulator
 
 @pytest.fixture
 def temp_telemetry_file():
