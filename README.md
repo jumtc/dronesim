@@ -106,7 +106,7 @@ The simulator features a comprehensive logging system:
 
 ### Log Viewer Tool
 
-The log viewer utility helps analyze log files:
+The log viewer tool helps analyze log files:
 
 ```bash
 python tools/log_viewer.py --file server.log --level WARNING
