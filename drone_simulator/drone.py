@@ -4,6 +4,7 @@ from validators import validate_drone_input
 from telemetry import TelemetryManager
 from environment import EnvironmentSimulator
 from logging_config import get_logger
+from sandstorm import Sandstorm
 
 logger = get_logger("drone")
 
@@ -36,6 +37,10 @@ class DroneSimulator:
     def update_telemetry(self, user_input: Dict[str, Union[int, str]]) -> Dict:
         """Update drone telemetry based on user input."""
         logger.info(f"Drone {self.drone_id} - Updating telemetry with input: {user_input}")
+
+        # effect of sandstrom
+        self.sandstorm=Sandstorm()
+        self.telemetry["gyroscope"]= self.sandstorm.apply_effect(self.telemetry["gyroscope"])
         
         # If drone is already crashed, don't process new commands
         if self.crashed:
