@@ -3,12 +3,16 @@ from typing import Dict, Union, Any
 from validators import validate_drone_input
 from telemetry import TelemetryManager
 from environment import EnvironmentSimulator
+from logging_config import get_logger
+
+logger = get_logger("drone")
 
 class DroneSimulator:
     """Simulates drone flight and telemetry."""
     
     def __init__(self, telemetry_file: str = 'telemetry.json'):
         """Initialize drone simulator."""
+        logger.info(f"Initializing drone simulator with telemetry file: {telemetry_file}")
         self.telemetry_manager = TelemetryManager(telemetry_file)
         self.telemetry = self.telemetry_manager.get_telemetry()
         self.movement_speed = 5
@@ -18,29 +22,53 @@ class DroneSimulator:
         self.total_distance = 0
         self.crashed = False
         self.crash_reason = None
+        self.drone_id = telemetry_file.split("_")[-1].split(".")[0] if "_" in telemetry_file else "main"
+        logger.debug(f"Drone {self.drone_id} initialized with telemetry: {self.telemetry}")
 
     def validate_input(self) -> Union[bool, str]:
         """Validate user input."""
-        return validate_drone_input(self.user_input)
+        logger.debug(f"Validating input: {self.user_input}")
+        result = validate_drone_input(self.user_input)
+        if result is not True:
+            logger.warning(f"Invalid input: {result}")
+        return result
 
     def update_telemetry(self, user_input: Dict[str, Union[int, str]]) -> Dict:
         """Update drone telemetry based on user input."""
+        logger.info(f"Drone {self.drone_id} - Updating telemetry with input: {user_input}")
+        
         # If drone is already crashed, don't process new commands
         if self.crashed:
-            raise ValueError(f"Drone has crashed: {self.crash_reason}. Cannot accept new commands.")
+            error_msg = f"Drone has crashed: {self.crash_reason}. Cannot accept new commands."
+            logger.error(f"Drone {self.drone_id} - {error_msg}")
+            raise ValueError(error_msg)
             
         self.user_input = user_input
         validation_result = self.validate_input()
         if validation_result is not True:
-            raise ValueError(f"Invalid input data: {validation_result}")
+            error_msg = f"Invalid input data: {validation_result}"
+            logger.error(f"Drone {self.drone_id} - {error_msg}")
+            raise ValueError(error_msg)
         
         # Store previous position for distance calculation
         prev_x_position = self.telemetry["x_position"]
+        prev_y_position = self.telemetry["y_position"]
         
         try:
             self._update_position()
+            logger.debug(f"Drone {self.drone_id} - Position updated: "
+                         f"X: {prev_x_position} -> {self.telemetry['x_position']}, "
+                         f"Y: {prev_y_position} -> {self.telemetry['y_position']}")
+            
+            prev_battery = self.telemetry["battery"]
             self._update_battery()
+            logger.debug(f"Drone {self.drone_id} - Battery updated: "
+                         f"{prev_battery:.1f}% -> {self.telemetry['battery']:.1f}%")
+            
             self._update_environmental_conditions()
+            logger.debug(f"Drone {self.drone_id} - Environmental conditions updated: "
+                         f"Wind: {self.telemetry['wind_speed']}, Dust: {self.telemetry['dust_level']}")
+            
             self._check_drone_crash()
             
             # Calculate distance traveled
@@ -50,6 +78,8 @@ class DroneSimulator:
             # Count iterations when speed is not zero
             if user_input.get("speed", 0) != 0:
                 self.iteration_count += 1
+                logger.info(f"Drone {self.drone_id} - Flight iteration {self.iteration_count}: "
+                           f"Distance traveled: +{distance:.1f}, Total: {self.total_distance:.1f}")
             
             # Save updated telemetry
             self.telemetry_manager.update_telemetry(self.telemetry)
@@ -60,6 +90,7 @@ class DroneSimulator:
             # Mark the drone as crashed and save the crash reason
             self.crashed = True
             self.crash_reason = str(e)
+            logger.critical(f"Drone {self.drone_id} - CRASHED: {self.crash_reason}")
             
             # Save the final state
             self.telemetry_manager.update_telemetry(self.telemetry)
@@ -77,11 +108,13 @@ class DroneSimulator:
         if self.crashed:
             metrics["crashed"] = True
             metrics["crash_reason"] = self.crash_reason
-            
+        
+        logger.debug(f"Drone {self.drone_id} - Metrics retrieved: {metrics}")    
         return metrics
     
     def reset(self) -> None:
         """Reset the drone to its initial state."""
+        logger.info(f"Drone {self.drone_id} - Resetting to initial state")
         self.telemetry = {
             "x_position": 0,
             "y_position": 0, 
@@ -96,6 +129,7 @@ class DroneSimulator:
         self.total_distance = 0
         self.crashed = False
         self.crash_reason = None
+        logger.info(f"Drone {self.drone_id} - Reset complete")
     
     def _update_position(self) -> None:
         """Update drone position based on user input."""
@@ -119,7 +153,11 @@ class DroneSimulator:
         altitude_change = self.user_input.get("altitude", 0)
         
         # Simulate battery drain
-        self.telemetry["battery"] = self.telemetry["battery"] - (.5 * speed + abs(altitude_change) * 0.005) - 0.5
+        drain_amount = (.5 * speed + abs(altitude_change) * 0.005) - 0.5
+        self.telemetry["battery"] = self.telemetry["battery"] - drain_amount
+        
+        if self.telemetry["battery"] < 20:
+            logger.warning(f"Drone {self.drone_id} - Low battery: {self.telemetry['battery']:.1f}%")
 
     def _update_environmental_conditions(self) -> None:
         """Update environmental conditions affecting the drone."""
