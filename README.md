@@ -67,7 +67,10 @@ python drone_simulator/client.py
 python examples/simple_client.py
 ```
 
-3. Your own WebSocket client implementation
+3. Visualization client:
+```bash
+python examples/droneviz.py
+```
 
 ## Admin Dashboard
 
