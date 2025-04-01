@@ -24,6 +24,7 @@ class DroneSimulatorServer:
         self.drones: Dict[str, DroneSimulator] = {}
         self.metrics: Dict[str, Dict[str, Any]] = {}
         self.last_activity: Dict[str, float] = {}  # Track last activity time for each connection
+        self.heartbeat_tasks: Dict[str, asyncio.Task] = {}  # Track heartbeat tasks
         self.start_time = time.time()
         logger.debug("Server initialized")
 
@@ -53,6 +54,7 @@ class DroneSimulatorServer:
         self.last_activity[connection_id] = time.time()
         
         logger.info(f"Client registered: {connection_id} from {client_info}")
+        logger.info(f"Active connections: {len(self.connections)}")
         return connection_id
 
     async def unregister(self, connection_id: str) -> None:
@@ -94,6 +96,12 @@ class DroneSimulatorServer:
             
         if connection_id in self.last_activity:
             del self.last_activity[connection_id]
+
+        # Cancel and remove heartbeat task if exists
+        if connection_id in self.heartbeat_tasks:
+            if not self.heartbeat_tasks[connection_id].done():
+                self.heartbeat_tasks[connection_id].cancel()
+            del self.heartbeat_tasks[connection_id]
             
         logger.info(f"Client unregistered: {connection_id}")
         logger.info(f"Active connections: {len(self.connections)}")
@@ -102,6 +110,14 @@ class DroneSimulatorServer:
         """Process a drone command and update metrics."""
         logger.debug(f"Processing command from {connection_id}: {data}")
         
+        # Check if connection still exists
+        if connection_id not in self.drones or connection_id not in self.metrics:
+            logger.warning(f"Cannot process command - connection {connection_id} no longer exists")
+            return {
+                "status": "error",
+                "message": "Connection no longer exists"
+            }
+            
         drone = self.drones[connection_id]
         metrics = self.metrics[connection_id]
         
@@ -176,9 +192,11 @@ class DroneSimulatorServer:
             await websocket.send(json.dumps(welcome_msg))
             logger.info(f"Welcome message sent to {connection_id}")
             
-            # Start heartbeat task for this connection
+            # Start heartbeat task for this connection (as a separate task)
             logger.debug(f"Starting heartbeat task for {connection_id}")
-            heartbeat_task = asyncio.create_task(self.connection_heartbeat(connection_id, websocket))
+            self.heartbeat_tasks[connection_id] = asyncio.create_task(
+                self.connection_heartbeat(connection_id, websocket)
+            )
             
             # Process messages
             async for message in websocket:
@@ -187,10 +205,19 @@ class DroneSimulatorServer:
                     logger.info(f"Received from {connection_id}: {data}")
                     
                     # Update last activity time
-                    self.last_activity[connection_id] = time.time()
+                    if connection_id in self.last_activity:
+                        self.last_activity[connection_id] = time.time()
+                    else:
+                        logger.warning(f"Connection {connection_id} no longer registered")
+                        break
                     
                     # Process the command
                     response = await self.handle_drone_command(connection_id, data)
+                    
+                    # Check if connection still exists before sending response
+                    if connection_id not in self.connections:
+                        logger.warning(f"Cannot send response - connection {connection_id} no longer exists")
+                        break
                     
                     # Send response back to client
                     await websocket.send(json.dumps(response))
@@ -214,11 +241,6 @@ class DroneSimulatorServer:
         except Exception as e:
             logger.error(f"Error handling connection {connection_id}: {e}", exc_info=True)
         finally:
-            # Cancel heartbeat task
-            if 'heartbeat_task' in locals() and not heartbeat_task.done():
-                logger.debug(f"Cancelling heartbeat task for {connection_id}")
-                heartbeat_task.cancel()
-                
             await self.unregister(connection_id)
 
     async def connection_heartbeat(self, connection_id: str, websocket: WebSocketServerProtocol) -> None:
@@ -226,34 +248,46 @@ class DroneSimulatorServer:
         logger.debug(f"Heartbeat started for {connection_id}")
         
         try:
-            while connection_id in self.connections:
+            while True:
+                # Check if connection still exists before attempting ping
+                if connection_id not in self.connections:
+                    logger.debug(f"Connection {connection_id} no longer exists, stopping heartbeat")
+                    break
+                
                 # Send a ping to check the connection
                 logger.debug(f"Sending ping to {connection_id}")
-                pong_waiter = await websocket.ping()
                 try:
+                    pong_waiter = await websocket.ping()
                     await asyncio.wait_for(pong_waiter, timeout=10)
                     logger.debug(f"Received pong from {connection_id}")
-                except asyncio.TimeoutError:
+                except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
                     logger.warning(f"Ping timeout for {connection_id}, closing connection")
-                    # Close connection with status code 1011 (internal error)
-                    await websocket.close(code=1011, reason="Ping timeout")
+                    try:
+                        # Close connection with status code 1011 (internal error)
+                        await websocket.close(code=1011, reason="Ping timeout")
+                    except:
+                        pass
                     break
                 
                 # Check for inactivity
-                current_time = time.time()
-                last_active = self.last_activity.get(connection_id, 0)
-                inactivity_duration = current_time - last_active
-                
-                logger.debug(f"Client {connection_id} inactive for {inactivity_duration:.1f}s")
-                
-                if inactivity_duration > 120:  # 2 minutes inactivity timeout
-                    logger.warning(f"Client {connection_id} inactive for {inactivity_duration:.1f}s, closing connection")
-                    await websocket.send(json.dumps({
-                        "status": "error",
-                        "message": "Connection closed due to inactivity",
-                    }))
-                    await websocket.close(code=1000, reason="Inactivity timeout")
-                    break
+                if connection_id in self.last_activity:
+                    current_time = time.time()
+                    last_active = self.last_activity.get(connection_id, 0)
+                    inactivity_duration = current_time - last_active
+                    
+                    logger.debug(f"Client {connection_id} inactive for {inactivity_duration:.1f}s")
+                    
+                    if inactivity_duration > 120:  # 2 minutes inactivity timeout
+                        logger.warning(f"Client {connection_id} inactive for {inactivity_duration:.1f}s, closing connection")
+                        try:
+                            await websocket.send(json.dumps({
+                                "status": "error",
+                                "message": "Connection closed due to inactivity",
+                            }))
+                            await websocket.close(code=1000, reason="Inactivity timeout")
+                        except:
+                            pass
+                        break
                 
                 # Wait before next ping
                 await asyncio.sleep(30)  # Send ping every 30 seconds
@@ -280,21 +314,28 @@ class DroneSimulatorServer:
         logger.info(f"Server started successfully on ws://{self.host}:{self.port}")
         logger.info("Waiting for connections...")
         
-        # Keep server running and log periodic stats
-        while True:
-            await asyncio.sleep(300)  # Log stats every 5 minutes
-            uptime = time.time() - self.start_time
-            connected_clients = len(self.connections)
-            
-            # Calculate total metrics across all drones
-            total_iterations = sum(m.get("iterations", 0) for m in self.metrics.values())
-            total_distance = sum(m.get("total_distance", 0) for m in self.metrics.values())
-            total_commands = sum(m.get("commands_sent", 0) for m in self.metrics.values())
-            
-            logger.info(f"Server stats - Uptime: {uptime:.1f}s, Clients: {connected_clients}, "
-                       f"Total iterations: {total_iterations}, "
-                       f"Total distance: {total_distance:.1f}, "
-                       f"Total commands: {total_commands}")
+        # Stats logging task
+        async def log_periodic_stats():
+            while True:
+                await asyncio.sleep(300)  # Log stats every 5 minutes
+                uptime = time.time() - self.start_time
+                connected_clients = len(self.connections)
+                
+                # Calculate total metrics across all drones
+                total_iterations = sum(m.get("iterations", 0) for m in self.metrics.values())
+                total_distance = sum(m.get("total_distance", 0) for m in self.metrics.values())
+                total_commands = sum(m.get("commands_sent", 0) for m in self.metrics.values())
+                
+                logger.info(f"Server stats - Uptime: {uptime:.1f}s, Clients: {connected_clients}, "
+                           f"Total iterations: {total_iterations}, "
+                           f"Total distance: {total_distance:.1f}, "
+                           f"Total commands: {total_commands}")
+        
+        # Start stats logging task separately
+        stats_task = asyncio.create_task(log_periodic_stats())
+        
+        # Keep server running forever
+        await asyncio.Future()  # This line replaces the while True loop
 
 
 def main() -> None:
