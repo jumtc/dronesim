@@ -11,6 +11,8 @@ A WebSocket-based drone simulator that provides real-time telemetry data and sim
 - Telemetry persistence between sessions
 - Admin dashboard for monitoring all drone connections
 - Crash detection with detailed reporting
+- Comprehensive logging system with configurable outputs
+- Command-line tools for log analysis and system monitoring
 
 ## Project Structure
 
@@ -22,11 +24,25 @@ drone_simulator/
 ├── dashboard.py        # Admin dashboard interface
 ├── drone.py            # Core drone simulation logic
 ├── environment.py      # Environmental condition simulator
+├── logging_config.py   # Centralized logging configuration
 ├── main.py             # Simple example usage
 ├── run_server.py       # Server startup script
 ├── server.py           # WebSocket server implementation
 ├── telemetry.py        # Telemetry data management
 └── validators.py       # Input validation utilities
+examples/
+├── simple_client.py    # Example client implementation
+logs/                   # Directory for log files
+├── .gitignore          # Git ignore file for logs
+├── client.log          # Client activity logs
+├── drone.log           # Drone simulation logs
+├── server.log          # Server activity logs
+└── ...
+tests/
+├── __init__.py
+└── test_drone.py       # Tests for drone simulator
+tools/
+└── log_viewer.py       # Utility for viewing and filtering logs
 ```
 
 ## Getting Started
@@ -36,13 +52,15 @@ drone_simulator/
 - Python 3.7+
 - websockets
 - pytest (for running tests)
+- tabulate (for admin dashboard)
+- asyncio
 
 ### Installation
 
 1. Clone the repository
 2. Install dependencies:
 ```bash
-pip install websockets pytest
+pip install -r requirements.txt
 ```
 
 ### Running the Server
@@ -79,6 +97,31 @@ Monitor all drone connections with the admin dashboard:
 ```bash
 python drone_simulator/dashboard.py
 ```
+
+## Logging System
+
+The simulator features a comprehensive logging system:
+
+- All components log to both console and files
+- Log files are stored in the `logs/` directory
+- Different components have separate log files (server.log, client.log, drone.log)
+- Logging level is configurable (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+### Log Viewer Tool
+
+The log viewer tool helps analyze log files:
+
+```bash
+python tools/log_viewer.py --file server.log --level WARNING
+```
+
+Options:
+- `--file`: Specific log file to view
+- `--list`: List all available log files
+- `--hours`/`--minutes`: Filter logs by time period
+- `--level`: Filter by log level
+- `--text`: Filter logs containing specific text
+- `--tail`: Show only the last N lines
 
 ## API Reference
 
@@ -133,7 +176,9 @@ The server responds with telemetry data:
 
 - Battery Drains to 0.
 - Altitude becomes negative.
+- Exceeding maximum position limit.
 - Only calculates iteration when speed != 0
+
 
 ## Testing
 
