@@ -144,10 +144,21 @@ class DroneSimulatorServer:
             
             metrics["last_position"] = telemetry["x_position"]
             
-            # Include metrics in the response
+            # Encode telemetry in string format
+            telemetry_str = (
+                f"X-{telemetry['x_position']}-"
+                f"Y-{telemetry['y_position']}-"
+                f"BAT-{telemetry['battery']}-"
+                f"GYR-{telemetry['gyroscope']}-"
+                f"WIND-{telemetry['wind_speed']}-"
+                f"DUST-{telemetry['dust_level']}-"
+                f"SENS-{telemetry['sensor_status']}"
+            )
+            
+            # Include metrics and encoded telemetry in the response
             response = {
                 "status": "success",
-                "telemetry": telemetry,
+                "telemetry": telemetry_str,
                 "metrics": {
                     "iterations": metrics["iterations"],
                     "total_distance": metrics["total_distance"]
