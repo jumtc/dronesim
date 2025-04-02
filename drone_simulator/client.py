@@ -293,21 +293,22 @@ Examples:
             return
             
         print("\n----- Telemetry -----")
-        print(f"Position: ({self.telemetry['x_position']}, {self.telemetry['y_position']})")
-        print(f"Battery: {self.telemetry['battery']:.1f}%")
-        print(f"Wind Speed: {self.telemetry['wind_speed']}%")
-        print(f"Dust Level: {self.telemetry['dust_level']}%")
-        print(f"Sensor Status: {self.telemetry['sensor_status']}")
-        print(f"Gyroscope: {self.telemetry['gyroscope']}")
+        # print(f"Position: ({self.telemetry['x_position']}, {self.telemetry['y_position']})")
+        # print(f"Battery: {self.telemetry['battery']:.1f}%")
+        # print(f"Wind Speed: {self.telemetry['wind_speed']}%")
+        # print(f"Dust Level: {self.telemetry['dust_level']}%")
+        # print(f"Sensor Status: {self.telemetry['sensor_status']}")
+        # print(f"Gyroscope: {self.telemetry['gyroscope']}")
+        print(self.telemetry)
         
         print("\n----- Metrics -----")
         print(f"Successful Iterations: {self.metrics['iterations']}")
         print(f"Total Distance: {self.metrics['total_distance']}")
         
-        logger.info(f"Status displayed - Position: ({self.telemetry['x_position']}, {self.telemetry['y_position']}), "
-                   f"Battery: {self.telemetry['battery']:.1f}%, "
-                   f"Iterations: {self.metrics['iterations']}, "
-                   f"Distance: {self.metrics['total_distance']}")
+        # logger.info(f"Status displayed - Position: ({self.telemetry['x_position']}, {self.telemetry['y_position']}), "
+        #            f"Battery: {self.telemetry['battery']:.1f}%, "
+        #            f"Iterations: {self.metrics['iterations']}, "
+        #            f"Distance: {self.metrics['total_distance']}")
 
 def main() -> None:
     """Start the drone client."""
