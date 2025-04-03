@@ -170,6 +170,16 @@ class DroneSimulatorServer:
         except ValueError as e:
             crash_message = str(e)
             logger.warning(f"Drone crashed for {connection_id}: {crash_message}")
+
+            final_telemetry_str = (
+                f"X-{drone.telemetry['x_position']}-"
+                f"Y-{drone.telemetry['y_position']}-"
+                f"BAT-{drone.telemetry['battery']}-"
+                f"GYR-{drone.telemetry['gyroscope']}-"
+                f"WIND-{drone.telemetry['wind_speed']}-"
+                f"DUST-{drone.telemetry['dust_level']}-"
+                f"SENS-{drone.telemetry['sensor_status']}"
+            )
             
             # Create a detailed crash response
             response = {
@@ -179,7 +189,7 @@ class DroneSimulatorServer:
                     "iterations": metrics["iterations"],
                     "total_distance": metrics["total_distance"]
                 },
-                "final_telemetry": drone.telemetry,
+                "final_telemetry": final_telemetry_str,
                 "connection_terminated": True
             }
             
