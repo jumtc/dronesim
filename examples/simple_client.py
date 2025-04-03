@@ -9,6 +9,7 @@ import time
 import random
 import logging
 from typing import Dict, Any
+import re
 
 # Configure logging
 logging.basicConfig(
@@ -17,6 +18,36 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
+
+def decode_string(s: str) -> dict:
+
+    pattern = (
+        r"X-(?P<x>-?\d+)-"            # x position
+        r"Y-(?P<y>-?\d+)-"            # y position
+        r"BAT-(?P<battery>-?\d+(?:\.\d+)?)-"  # battery (float)
+        r"GYR-\[(?P<gyro>[^\]]+)\]-"   # gyroscope values within brackets
+        r"WIND-(?P<wind>-?\d+)-"       # wind speed
+        r"DUST-(?P<dust>-?\d+)-"       # dust level
+        r"SENS-(?P<sensor>[A-Z]+)"     # sensor status (expected GREEN, YELLOW, or RED)
+    )
+    
+    match = re.match(pattern, s)
+    if not match:
+        raise ValueError("Input string does not match expected format.")
+    
+    # Process gyroscope values: split by comma and convert to floats.
+    gyro_values = [float(val.strip()) for val in match.group("gyro").split(",")]
+    
+    result = {
+        "x_position": int(match.group("x")),
+        "y_position": int(match.group("y")),
+        "battery": float(match.group("battery")),
+        "gyroscope": gyro_values,
+        "wind_speed": int(match.group("wind")),
+        "dust_level": int(match.group("dust")),
+        "sensor_status": match.group("sensor")
+    }
+    return result
 
 class SimpleDroneClient:
     """A simple drone client example for hackathon participants."""
@@ -104,6 +135,7 @@ class SimpleDroneClient:
                 # Show final telemetry
                 if "final_telemetry" in data:
                     self.telemetry = data["final_telemetry"]
+                    self.telemetry = decode_string(self.telemetry)
                 
                 print("\nFinal Flight Statistics:")
                 print(f"Total distance traveled: {self.metrics.get('total_distance', 0)}")
@@ -115,11 +147,12 @@ class SimpleDroneClient:
             if data["status"] == "success":
                 self.telemetry = data["telemetry"]
                 self.metrics = data["metrics"]
+                self.telemetry = decode_string(self.telemetry)
                 return True
             else:
                 print(f"Error: {data.get('message')}")
                 return False
-                
+                     
         except websockets.exceptions.ConnectionClosed as e:
             logger.error(f"Connection closed while sending command: {e}")
             raise
