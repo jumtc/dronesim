@@ -4,24 +4,12 @@ from typing import Dict, Any, List
 
 class EnvironmentSimulator:
     """Simulates environmental conditions affecting the drone."""
-    
-    @staticmethod
-    def generate_gyroscope_values() -> List[float]:
-        """Generate random gyroscope values."""
-        return [
-            random.uniform(-1.0, 1.0),
-            random.uniform(-1.0, 1.0),
-            random.uniform(-1.0, 1.0)
-        ]
-    
+
     @staticmethod
     def simulate_environmental_conditions(telemetry: Dict[str, Any]) -> Dict[str, Any]:
         """Update telemetry with simulated environmental conditions."""
         # Copy telemetry to avoid modifying the original
         updated_telemetry = telemetry.copy()
-        
-        # Update gyroscope values
-        updated_telemetry["gyroscope"] = EnvironmentSimulator.generate_gyroscope_values()
         
         # Random wind changes
         updated_telemetry["wind_speed"] = int(random.uniform(0, 100))
