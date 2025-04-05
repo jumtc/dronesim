@@ -135,7 +135,7 @@ class DroneSimulatorServer:
             telemetry = drone.update_telemetry(data)
             
             # Calculate metrics
-            if data.get("speed", 0) != 0:
+            if data.get("speed", 0) != 0 and data.get("altitude", 0) != 0:
                 metrics["iterations"] += 1
                 distance_traveled = abs(telemetry["x_position"] - prev_position)
                 metrics["total_distance"] += distance_traveled
