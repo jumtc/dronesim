@@ -4,6 +4,7 @@ from validators import validate_drone_input
 from telemetry import TelemetryManager
 from environment import EnvironmentSimulator
 from logging_config import get_logger
+import math
 
 logger = get_logger("drone")
 
@@ -148,13 +149,53 @@ class DroneSimulator:
             self.telemetry["y_position"] = self.telemetry["y_position"] + altitude_change
     
     def _update_battery(self) -> None:
-        """Update battery level based on drone operations."""
+        """
+        Update battery level based on drone operations.
+        
+        Uses a continuous function to model battery drain based on altitude:
+        - Lower altitudes have higher air resistance, causing more battery drain
+        - Higher altitudes have less air resistance, causing less battery drain
+        """
         speed = self.user_input.get("speed", 0)
         altitude_change = self.user_input.get("altitude", 0)
+        current_altitude = self.telemetry["y_position"]
         
-        # Simulate battery drain
-        drain_amount = (.5 * speed + abs(altitude_change) * 0.005) - 0.5
-        self.telemetry["battery"] = self.telemetry["battery"] - drain_amount
+        # Base drain calculation from speed and altitude change
+        base_drain = (0.5 * speed + abs(altitude_change) * 0.005)
+        
+        # Calculate altitude factor using a continuous function
+        # We'll use an exponential decay function: f(y) = a + (b-a) * e^(-c*y)
+        # where:
+        # - y is the altitude
+        # - a is the minimum multiplier (at infinite altitude)
+        # - b is the maximum multiplier (at ground level)
+        # - c controls the rate of decay
+        
+        min_multiplier = 0.6    # Minimum drain factor at very high altitude
+        max_multiplier = 1.8    # Maximum drain factor at ground level
+        decay_rate = 0.03       # Controls how quickly the factor decreases with altitude
+        
+        # Calculate altitude factor
+        altitude_factor = min_multiplier + (max_multiplier - min_multiplier) * math.exp(-decay_rate * current_altitude)
+        
+        # Apply the altitude factor to the base drain
+        total_drain = base_drain * altitude_factor
+        
+        # Apply a minimum drain (even when hovering)
+        minimum_drain = 0.1
+        drain_amount = max(total_drain, minimum_drain)
+        
+        # Update battery level
+        prev_battery = self.telemetry["battery"]
+        self.telemetry["battery"] = max(0, prev_battery - drain_amount)
+        
+        # Log detailed battery information
+        logger.debug(f"Drone {self.drone_id} - Battery drain details: "
+                    f"Base drain: {base_drain:.2f}%, "
+                    f"Altitude: {current_altitude:.1f}, "
+                    f"Altitude factor: {altitude_factor:.2f}x, "
+                    f"Total drain: {drain_amount:.2f}%, "
+                    f"Battery: {prev_battery:.1f}% -> {self.telemetry['battery']:.1f}%")
         
         if self.telemetry["battery"] < 20:
             logger.warning(f"Drone {self.drone_id} - Low battery: {self.telemetry['battery']:.1f}%")
